@@ -138,11 +138,14 @@ window.PondScene = (() => {
     ellipse(bx,afloat+13,164*bs,10,"rgba(17,94,83,.23)");
     ring(bx,afloat+12,164*bs+5*Math.sin(t),.66);
     const flying=[];
+    // A packed flock settles closer together, keeping the upper rows in view.
+    const stackHeight = s.ducks.length / s.columns * 23 * s.duck.size;
+    const stackSpacing = Math.min(1, Math.min(132 * bs, H * .27) / Math.max(1, stackHeight));
     local(bx,by,bs,tilt,()=>{
       hullBack();
       for(const d of s.ducks){
         const p=clamp((t-d.born)/.44);
-        const x=d.x+s.shift*12, y=d.y;
+        const x=d.x+s.shift*12, y=-22+(d.y+22)*stackSpacing;
         if(p<1){flying.push([d,p,x,y]);continue}
         const fall=Math.max(0,Math.sin((t-d.born-.44)*18))*Math.max(0,1-(t-d.born-.44)*4);
         duck(x,y-3*fall,d.size/bs,Math.sin(d.seed+t*2)*.045-tilt*.47,d.heavy);

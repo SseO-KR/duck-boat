@@ -9,12 +9,20 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main id="game" data-state="ready">
-  <button type="button" id="water" aria-label="Hold to board ducks. Release to test the boat.">
+<main id="game" data-state="group">
+  <button type="button" id="water" disabled aria-label="Hold to board ducks. Release to test the boat.">
     <canvas id="scene" aria-hidden="true"></canvas>
     <span class="cue" aria-hidden="true"><i class="touch-mark"></i><span>Touching</span></span>
     <span class="replay" aria-hidden="true"><i></i></span>
   </button>
+  <section id="crew" aria-labelledby="crew-title">
+    <h1 id="crew-title">How many people?</h1>
+    <div class="crew-options">
+      <button type="button" data-group="small">Up to 4</button>
+      <button type="button" data-group="medium">4–8</button>
+      <button type="button" data-group="large">8+</button>
+    </div>
+  </section>
   <button type="button" id="sound" aria-label="Turn sound on" aria-pressed="false"><i class="note" aria-hidden="true"></i></button>
   <span class="sr" role="status" id="announce"></span>
 </main>

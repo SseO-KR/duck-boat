@@ -3,6 +3,7 @@
   const surface = document.getElementById("water");
   const sound = document.getElementById("sound");
   const status = document.getElementById("announce");
+  const crew = document.getElementById("crew");
   const clamp = value => Math.min(1, Math.max(0, value));
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -12,6 +13,19 @@
   const ducks = [
     {size: 0.43, mass: 0.65}, {size: 0.71, mass: 1.12}, {size: 1.08, mass: 2.15, heavy: true}
   ];
+  const groupLoads = {
+    small: [32, 46],
+    medium: [58, 80],
+    large: [90, 124]
+  };
+  function boardingCapacity(boat, duck, group) {
+    // Keep the full spread of hull sizes and duck weights inside this group's range.
+    const lightLoad = boats[0].capacity / ducks.at(-1).mass;
+    const heavyLoad = boats.at(-1).capacity / ducks[0].mass;
+    const fraction = (boat.capacity / duck.mass - lightLoad) / (heavyLoad - lightLoad);
+    const [minimum, maximum] = groupLoads[group];
+    return Math.round(minimum + fraction * (maximum - minimum)) * duck.mass;
+  }
   function pickDifferent(tiers, previous) {
     const choices = tiers.filter(tier => tier !== previous);
     return choices[Math.floor(Math.random() * choices.length)];
@@ -98,17 +112,33 @@
     state.endingTime = 0;
     syncEndingAudio();
   }
-  function newRound() {
+  let lastGroupButton = null;
+  function chooseGroup() {
     const boat = pickDifferent(boats, state?.boat);
     const duck = pickDifferent(ducks, state?.duck);
     state = {boat, duck, clock: 1, quiet: reducedMotion, ducks: [], mass: 0, moment: 0, ratio: 0,
       angle: 0, shift: 0, focus: 0, sink: 0, lastBeat: -1};
     // Seats are boat-local; duck dimensions and weight are independent of hull size.
     state.columns = Math.max(3, Math.floor(boat.scale * 242 / (duck.size * 39)));
-    state.limit = Math.ceil(1.45 * boat.capacity / duck.mass);
     owner = null;
+    surface.disabled = true;
+    crew.hidden = false;
+    setMode("group", "Choose your group size.");
+    lastGroupButton?.focus({preventScroll: true});
+  }
+  for (const button of crew.querySelectorAll("button")) {
+    button.addEventListener("click", () => startRound(button));
+  }
+  function startRound(button) {
+    if (state.mode !== "group") return;
+    state.capacity = boardingCapacity(state.boat, state.duck, button.dataset.group);
+    state.limit = Math.ceil(1.15 * state.capacity / state.duck.mass);
+    lastGroupButton = button;
+    crew.hidden = true;
+    surface.disabled = false;
     board(-2); board(-2);
     setMode("ready", "Hold anywhere on the water to board ducks.");
+    surface.focus({preventScroll: true});
   }
   function board(born) {
     const s = state, i = s.ducks.length, columns = s.columns;
@@ -120,7 +150,7 @@
     s.ducks.push({...s.duck, x, y, born, seed: Math.random() * 6});
     s.mass += s.duck.mass;
     s.moment += x * s.duck.mass;
-    s.ratio = (s.mass + Math.abs(s.moment) / 420) / s.boat.capacity;
+    s.ratio = (s.mass + Math.abs(s.moment) / 420) / s.capacity;
   }
   function begin(id) {
     if (state.mode !== "ready" || owner !== null) return false;
@@ -161,7 +191,7 @@
     e.preventDefault(); release(e.code);
   });
   surface.addEventListener("click", e => {
-    if (state.mode === "lost") newRound();
+    if (state.mode === "lost") chooseGroup();
     else if (e.detail === 0 && begin("assist")) release("assist");
   });
   function interrupt() { release(owner); lastFrame = performance.now(); }
@@ -226,5 +256,5 @@
     }
     PondScene.draw(state,runTime*1000); requestAnimationFrame(frame);
   }
-  updateSound(); newRound(); loadEndingAudio(); requestAnimationFrame(frame);
+  updateSound(); chooseGroup(); loadEndingAudio(); requestAnimationFrame(frame);
 })();
