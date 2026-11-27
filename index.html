@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f8f6ec"><link rel="icon" href="data:,">
+<title>뒤뚱호 · 오리 선착장</title><link rel="stylesheet" href="style.css">
+</head><body>
+<header><div class="bar"><div class="brand"><span class="duck-logo" aria-hidden="true"><i></i></span>오리 선착장</div>
+<nav><button id="help" class="quiet"><span class="circ" aria-hidden="true">?</span>게임 방법</button><button id="sound" class="quiet" aria-label="소리 켜기" aria-pressed="false"><span aria-hidden="true">♪</span><span id="soundText">소리 꺼짐</span></button></nav></div></header>
+<main><div class="intro"><h1>뒤뚱호<span aria-hidden="true" class="wave">≈</span></h1><p>돌아가며 오리를 태워요. 배를 가라앉힌 사람이 져요.</p></div>
+<div class="layout"><section aria-label="오리 배 게임" class="playcard">
+<div id="stage"><canvas id="scene" aria-label="오리들이 뛰어드는 배와 호수"></canvas>
+<div class="hud"><span class="tag" id="phase">승선 대기</span><span class="count"><i class="duck-mini" aria-hidden="true"></i><b id="duckCount">2</b>마리</span></div>
+<div id="caption" class="caption" hidden></div></div>
+<div class="console"><div class="turn-line"><span class="lamp"></span><strong id="turn"></strong><span id="turnNote"></span></div>
+<button id="hold" class="hold"><span class="button-duck" aria-hidden="true">+</span><span id="action">꾹 눌러 오리 태우기</span></button>
+<p class="control-tip" id="tip">누르는 동안 승선하고, 손을 떼면 배가 흔들려요.</p></div></section>
+<aside><div class="roster-head"><h2>탑승 순서</h2><button id="edit" class="edit">편집</button></div><ol id="roster"></ol>
+<div class="ticket"><div class="ticket-title"><span class="bmark" aria-hidden="true">⚓</span><b>이번 배</b></div><div class="spec"><span>선체 크기</span><strong id="boatSize"></strong></div><div class="spec"><span>승선 오리</span><strong>무게 제각각</strong></div></div>
+</aside></div></main>
+<dialog id="modal"><form method="dialog"><button id="close" class="close" aria-label="닫기">×</button></form><div id="modalBody"></div></dialog>
+<div id="announce" class="sr" aria-live="polite"></div>
+<script src="scene.js"></script><script src="game.js"></script>
+</body></html>
