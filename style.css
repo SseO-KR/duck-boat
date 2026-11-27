@@ -81,8 +81,13 @@ button{font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
 #game-tools button:focus-visible,#help-close:focus-visible{outline:3px solid #184d40;outline-offset:2px}
 .sr{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}
 @media(max-height:480px){#game-tools{top:max(8px,env(safe-area-inset-top))}.replay{bottom:max(4%,env(safe-area-inset-bottom));width:48px;height:48px}}
-@media(orientation:landscape) and (max-height:540px){
-  #help{width:min(740px,calc(100% - 24px))}
-  .help-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(orientation:landscape){
+  #help{width:min(850px,calc(100% - 24px))}
+  .help-steps{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(orientation:portrait) and (max-height:820px){
+  .help-steps{gap:8px}
+  .help-steps img{width:auto;max-width:100%;max-height:max(84px,calc((100dvh - 220px) / 3));margin-inline:auto}
+  .help-steps svg{width:36px;height:36px}
 }
 @media(prefers-reduced-motion:reduce){[data-state=ready] .hold-pulse{animation:none}.cue{transition:none}}
