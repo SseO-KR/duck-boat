@@ -1,0 +1,35 @@
+name: Check game
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  game:
+    name: Verify Duck Boat
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check JavaScript and game assets
+        run: |
+          node --check scene.js
+          node --check game.js
+          for asset in style.css pond.jpg false-clear.m4a; do
+            test -s "$asset"
+          done
+      - name: Open the game in Chrome
+        run: |
+          python3 -m http.server 8080 --bind 127.0.0.1 &
+          trap 'kill "$!"' EXIT
+          curl --fail --silent --retry 5 --retry-connrefused --output /dev/null http://127.0.0.1:8080/
+          google-chrome --headless --disable-gpu --virtual-time-budget=2500 \
+            --dump-dom http://127.0.0.1:8080/ > "$RUNNER_TEMP/duck-boat.html"
+          grep -Fq 'id="announce">Choose your group size.</span>' "$RUNNER_TEMP/duck-boat.html"
