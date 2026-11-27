@@ -11,10 +11,22 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<svg id="gesture-definitions" width="0" height="0" aria-hidden="true">
+  <symbol id="hold-gesture" viewBox="0 0 48 48">
+    <circle cx="23" cy="17" r="13"/><circle cx="23" cy="17" r="8"/>
+    <path class="gesture-hand" d="M20 30V17a3 3 0 0 1 6 0v9a3 3 0 0 1 5 1 3 3 0 0 1 5 2 3 3 0 0 1 5 2v4a11 11 0 0 1-11 11h-3a10 10 0 0 1-8-4l-6-8a3 3 0 0 1 5-4l2 2Z"/>
+  </symbol>
+</svg>
 <main id="game" data-state="group">
   <button type="button" id="water" disabled aria-label="Hold to board ducks. Release to test the boat.">
     <canvas id="scene" aria-hidden="true"></canvas>
-    <span class="cue" aria-hidden="true"><i class="touch-mark"></i><span>Touching</span></span>
+    <span class="cue" aria-hidden="true">
+      <svg class="hold-mark" width="48" height="48" viewBox="0 0 48 48">
+        <circle class="hold-pulse" cx="23" cy="17" r="13"/>
+        <use href="#hold-gesture"/>
+      </svg>
+      <span>Hold</span>
+    </span>
     <span class="replay" aria-hidden="true"><i></i></span>
   </button>
   <canvas id="intro-frame" hidden aria-hidden="true"></canvas>
@@ -40,8 +52,7 @@
       <img src="hold.webp" width="800" height="384" loading="lazy" alt="A duck jumps from the dock into the boat.">
       <figcaption>
         <svg aria-hidden="true" viewBox="0 0 48 48">
-          <circle cx="23" cy="17" r="13"/><circle cx="23" cy="17" r="8"/>
-          <path class="hand" d="M20 30V17a3 3 0 0 1 6 0v9a3 3 0 0 1 5 1 3 3 0 0 1 5 2 3 3 0 0 1 5 2v4a11 11 0 0 1-11 11h-3a10 10 0 0 1-8-4l-6-8a3 3 0 0 1 5-4l2 2Z"/>
+          <use href="#hold-gesture"/>
         </svg>
         Hold
       </figcaption>
@@ -52,7 +63,7 @@
         <svg aria-hidden="true" viewBox="0 0 48 48">
           <ellipse cx="19" cy="42" rx="13" ry="4"/>
           <path class="lift" d="M19 40v-9m-4 4 4-4 4 4"/>
-          <path class="hand" d="M34 4c6 3 8 9 6 15l-2 5a2.6 2.6 0 0 1-5-1 2.6 2.6 0 0 1-5 0 2.6 2.6 0 0 1-5-1l-2 5a3 3 0 0 1-5-3l4-12-5 3a3 3 0 0 1-3-5l9-6c4-2 9-2 13 0Z"/>
+          <path class="gesture-hand" d="M34 4c6 3 8 9 6 15l-2 5a2.6 2.6 0 0 1-5-1 2.6 2.6 0 0 1-5 0 2.6 2.6 0 0 1-5-1l-2 5a3 3 0 0 1-5-3l4-12-5 3a3 3 0 0 1-3-5l9-6c4-2 9-2 13 0Z"/>
         </svg>
         Release
       </figcaption>
