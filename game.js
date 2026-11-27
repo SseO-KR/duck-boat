@@ -1,7 +1,12 @@
 (() => {
   const game = document.getElementById("game");
   const surface = document.getElementById("water");
+  const scene = document.getElementById("scene");
+  const introFrame = document.getElementById("intro-frame");
+  const introTitle = document.getElementById("intro-title");
+  const toolbar = document.getElementById("game-tools");
   const sound = document.getElementById("sound");
+  const help = document.getElementById("help");
   const status = document.getElementById("announce");
   const crew = document.getElementById("crew");
   const clamp = value => Math.min(1, Math.max(0, value));
@@ -35,6 +40,18 @@
   const endingLength = 4.90;
   const inEnding = () => state?.mode === "safe" || state?.mode === "sinking";
 
+  function firstVisit() {
+    for (const name of ["localStorage", "sessionStorage"]) {
+      try {
+        const storage = window[name];
+        if (storage.getItem("pond.firstEntrySeen") === "true") return false;
+        storage.setItem("pond.firstEntrySeen", "true");
+        return true;
+      } catch {}
+    }
+    return true;
+  }
+
   async function loadEndingAudio() {
     const file = "false-clear.m4a";
     let src = file;
@@ -50,7 +67,7 @@
   }
 
   function syncEndingAudio() {
-    if (!soundOn || document.hidden || !inEnding()) {
+    if (!soundOn || document.hidden || help.open || !inEnding()) {
       endingAudio.pause();
       return;
     }
@@ -72,7 +89,7 @@
       endingAudio.muted = true;
       endingAudio.play().then(() => {
         endingUnlocked = true;
-        if (!inEnding() || !soundOn || document.hidden) endingAudio.pause();
+        if (!inEnding() || !soundOn || document.hidden || help.open) endingAudio.pause();
       }).catch(() => {});
     }
     try {
@@ -99,6 +116,13 @@
     if (inEnding() || !soundOn) syncEndingAudio();
     if (!inEnding()) note(440, 660, .1);
   };
+  document.getElementById("help-button").addEventListener("click", () => {
+    help.showModal();
+    release(owner);
+    syncEndingAudio();
+  });
+  document.getElementById("help-close").addEventListener("click", () => help.close());
+  help.addEventListener("close", syncEndingAudio);
 
   function setMode(mode, announcement = "") {
     state.mode = game.dataset.state = mode;
@@ -117,6 +141,7 @@
     owner = null;
     surface.disabled = true;
     crew.hidden = false;
+    toolbar.hidden = false;
     setMode("group", "Choose your group size.");
     lastGroupButton?.focus({preventScroll: true});
   }
@@ -157,7 +182,7 @@
     s.strain = clamp(s.ratio) ** 1.8;
   }
   function begin(id) {
-    if (state.mode !== "ready" || owner !== null) return false;
+    if (state.mode !== "ready" || owner !== null || help.open) return false;
     owner = id; setMode("hold"); wakeAudio();
     board(state.clock - .04); board(state.clock + .04);
     nextDuck = .135; note(530, 730, .055, 0, .025);
@@ -259,12 +284,38 @@
   function frame(now) {
     const dt = Math.min(.1,Math.max(0,(now-lastFrame)/1000));
     lastFrame = now;
-    if (!document.hidden) update(dt);
+    if (state.mode === "intro") {
+      if (!document.hidden) elapsed += dt;
+      if (elapsed < 3.92) {
+        if (elapsed >= 3.55) introTitle.classList.add("fading");
+        PondScene.drawIntro(elapsed);
+        requestAnimationFrame(frame);
+        return;
+      }
+      // Fade the last underwater frame over the newly reset pond.
+      introFrame.width = scene.width;
+      introFrame.height = scene.height;
+      introFrame.getContext("2d").drawImage(scene, 0, 0);
+      introFrame.addEventListener("animationend", () => introFrame.remove(), {once: true});
+      introFrame.hidden = false;
+      introTitle.hidden = true;
+      chooseGroup();
+    }
+    if (!document.hidden && !help.open) update(dt);
     if (inEnding() && !endingAudio.paused && endingAudio.readyState >= 2 &&
         Math.abs(endingAudio.currentTime - elapsed) > .20) {
       endingAudio.currentTime = Math.min(elapsed, endingLength);
     }
     PondScene.draw(state,runTime*1000); requestAnimationFrame(frame);
   }
-  updateSound(); chooseGroup(); loadEndingAudio(); requestAnimationFrame(frame);
+  updateSound();
+  if (firstVisit() && !reducedMotion) {
+    state = {};
+    setMode("intro");
+    introTitle.hidden = false;
+  } else {
+    chooseGroup();
+  }
+  loadEndingAudio();
+  requestAnimationFrame(frame);
 })();

@@ -121,7 +121,8 @@ window.PondScene = (() => {
     const H=h*W/w, scale=canvas.width/W;
     ctx.setTransform(scale,0,0,canvas.height/H,0,0);
     const afloat=H*(w<h?.65:.72), t=s.clock, r=s.ratio, end=s.sink;
-    const camera=H*.41*ease(part(end,.17,.78));
+    const intro=s.mode==="intro";
+    const camera=H*(intro?.085:.41)*ease(part(end,.17,.78));
     const zoom=1+(s.quiet?.018:.06)*s.focus;
     ctx.save();ctx.translate(W/2,H*.67);ctx.scale(zoom,zoom);ctx.translate(-W/2,-H*.67-camera);
     if(backdrop.complete && backdrop.naturalWidth){
@@ -147,7 +148,10 @@ window.PondScene = (() => {
     const landingRoll=end<.02 ? Math.tanh(impact)*(.006+.014*s.strain) : 0;
     const tilt=s.angle+Math.sin(t*1.24)*.004+landingRoll;
     const bs=s.boat.scale;
-    const bx=W*.557,by=afloat-29*bs+Math.min(r,1.5)*12+Math.sin(t*1.7)*2+H*(.49*ease(part(end,.12,.92))+.37*ease(part(end,.63,1)));
+    const drop=intro
+      ? .26*ease(part(end,.13,.84))+.24*ease(part(end,.66,1))
+      : .49*ease(part(end,.12,.92))+.37*ease(part(end,.63,1));
+    const bx=W*.557,by=afloat-29*bs+Math.min(r,1.5)*12+Math.sin(t*1.7)*2+H*drop;
     ellipse(bx,afloat+13,164*bs,10,"rgba(17,94,83,.23)");
     ring(bx,afloat+12,164*bs+5*Math.sin(t),.66);
     const lastRow = Math.max(0, Math.ceil(s.ducks.length / s.columns) - 1);
@@ -220,9 +224,37 @@ window.PondScene = (() => {
         duck(bx+100*bs,y,s.duck.size,.04,s.duck.heavy);
 
       }
+      if(intro){
+        const alpha=ease(part(end,.03,.21))*(1-.78*ease(part(end,.45,.84)));
+        for(let i=0;i<3;i++)ring(bx+12*i,afloat+5*i,112+22*i+88*end,(.71-.12*i)*alpha);
+      }
     }
     ctx.restore();
     verdict(s,W,H);
   }
-  return {draw,sequence};
+  const introDuck={size:1, mass:1.12, heavy:false};
+  const introBoat={scale:1};
+  const introSeats=[0,4,2,1,3];
+  const boardingTimes=[-2,-1,.10,.39,.65,.85,1.02,1.16,1.25,1.35,1.43,
+    1.49,1.57,1.65,1.71,1.80,1.87,1.95,2.03,2.09,2.15];
+  const introDucks=boardingTimes.map((born,index)=>({
+    ...introDuck, born, seed:index*2.39,
+    x:(introSeats[index%introSeats.length]-2)*43+3*Math.sin(index*7),
+    y:-29-Math.floor(index/introSeats.length)*23+2.6*Math.sin(index*4.5)
+  }));
+  const introTilt=[[0,-.016],[.65,.024],[1.16,-.027],[1.57,.10],[1.92,.19],[2.19,.31],
+    [2.39,.15],[2.61,.34],[2.90,.67],[3.38,.92],[3.88,1]];
+
+  function drawIntro(time) {
+    const ducks=introDucks.filter(duck=>duck.born<=time);
+    const settled=ducks.filter(duck=>duck.born+.40<=time).length;
+    const load=clamp((settled-2)/(introDucks.length-2));
+    const angle=sequence(time,introTilt);
+    draw({
+      mode:"intro", boat:introBoat, duck:introDuck, columns:introSeats.length, clock:time,
+      ducks, ratio:.12+1.22*load, strain:load, angle, shift:1.4*Math.sin(angle), focus:0,
+      sink:.93*ease(part(time,2.69,3.88))
+    },time*1000);
+  }
+  return {draw,drawIntro,sequence};
 })();

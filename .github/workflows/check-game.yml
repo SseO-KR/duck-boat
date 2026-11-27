@@ -22,7 +22,7 @@ jobs:
         run: |
           node --check scene.js
           node --check game.js
-          for asset in style.css pond.jpg false-clear.m4a; do
+          for asset in style.css pond.jpg hold.webp release.webp false-clear.m4a; do
             test -s "$asset"
           done
       - name: Open the game in Chrome
@@ -31,5 +31,8 @@ jobs:
           trap 'kill "$!"' EXIT
           curl --fail --silent --retry 5 --retry-connrefused --output /dev/null http://127.0.0.1:8080/
           google-chrome --headless --disable-gpu --virtual-time-budget=2500 \
+            --dump-dom http://127.0.0.1:8080/ > "$RUNNER_TEMP/duck-boat-intro.html"
+          grep -Fq 'data-state="intro"' "$RUNNER_TEMP/duck-boat-intro.html"
+          google-chrome --headless --disable-gpu --force-prefers-reduced-motion --virtual-time-budget=2500 \
             --dump-dom http://127.0.0.1:8080/ > "$RUNNER_TEMP/duck-boat.html"
           grep -Fq 'id="announce">Choose your group size.</span>' "$RUNNER_TEMP/duck-boat.html"
