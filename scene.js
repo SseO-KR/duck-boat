@@ -4,7 +4,7 @@ window.PondScene = (() => {
   const ctx = canvas.getContext("2d");
   const backdrop = new Image();
   backdrop.src = "pond.jpg";
-  const W = 800, PI = Math.PI;
+  const PI = Math.PI;
   const clamp = n => Math.min(1, Math.max(0, n));
   const part = (v,a,b) => clamp((v-a)/(b-a));
   const ease = n => n*n*(3-2*n);
@@ -58,7 +58,7 @@ window.PondScene = (() => {
     path([M(-150,-25),C(-79,0,82,0,151,-26)],null,"#785435",10);
     path([M(-150,-26),C(-79,-1,82,-1,151,-27)],null,"#f2cd8b",6.4);
     local(-71,5,1,.14,()=>{ctx.lineWidth=5.5;ctx.strokeStyle="#f2e2ba";ctx.beginPath();ctx.arc(0,0,9,0,2*PI);ctx.stroke();ctx.strokeStyle="#dc7049";for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(0,0,9,i*PI/2,i*PI/2+.69);ctx.stroke()}});
-    ctx.fillStyle="#f4eac3";ctx.font="bold 12px sans-serif";ctx.textAlign="center";ctx.fillText("뒤뚱호",46,23);
+
   }
   function ring(x,y,rx,alpha){
     ctx.strokeStyle="rgba(219,248,211,"+alpha+")";ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(x,y,rx,rx*.115,0,.02,PI*.93);ctx.stroke();
@@ -71,9 +71,10 @@ window.PondScene = (() => {
     const w=canvas.clientWidth,h=canvas.clientHeight;if(!w||!h)return;
     const dpr=Math.min(2,window.devicePixelRatio||1);
     if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr)}
+    const W=Math.max(492,Math.min(800,190+470*w/h));
     const H=h*W/w, scale=canvas.width/W;
     ctx.setTransform(scale,0,0,canvas.height/H,0,0);
-    const afloat=H*.77, t=s.clock, r=s.ratio, end=s.sink;
+    const afloat=H*(w<h?.65:.72), t=s.clock, r=s.ratio, end=s.sink;
     const camera=H*.41*ease(part(end,.17,.78));
     const zoom=1+(s.quiet?.018:.06)*s.focus;
     ctx.save();ctx.translate(W/2,H*.67);ctx.scale(zoom,zoom);ctx.translate(-W/2,-H*.67-camera);
@@ -89,14 +90,19 @@ window.PondScene = (() => {
       const x=(i*179+12+8*Math.sin(t*.6+i))%W, y=H*(.63+((i*13)%30)/100);
       line(x,y,x+10+i%4*8,y,"rgba(233,246,203,.38)",1.6);
     }
-    pier(afloat-9);
-    for(let i=0;i<3;i++) duck(25+i*34,afloat-33+Math.sin(t*1.8+i)*1.1,.68+i*.035,Math.sin(t+i)*.042);
+    const pierScale=W/800;
+    local(0,afloat-9,pierScale,0,()=>pier(0));
+    const waiting=Math.min(3,Math.max(1,Math.floor(125*pierScale/(s.duck.size*44))));
+    for(let i=0;i<waiting;i++){
+      duck((112-i*43*s.duck.size/pierScale)*pierScale,afloat-11-21*pierScale-8*s.duck.size+Math.sin(t+i),
+        s.duck.size,Math.sin(t+i)*.04,s.duck.heavy);
+    }
     const impact=s.ducks.reduce((sum,d)=>{const v=t-d.born-.44;return v>0&&v<1?sum+Math.sin(v*14)*Math.exp(-v*4)*d.mass:sum},0);
     const tilt=s.angle+Math.sin(t*1.24)*.012+(end<.02?impact*.009:0);
-    const bs=s.boat.scale*(w<500?1.06:1);
-    const bx=W*.557,by=afloat-29+Math.min(r,1.5)*12+Math.sin(t*1.7)*2+H*(.49*ease(part(end,.12,.92))+.37*ease(part(end,.63,1)));
+    const bs=s.boat.scale;
+    const bx=W*.557,by=afloat-29*bs+Math.min(r,1.5)*12+Math.sin(t*1.7)*2+H*(.49*ease(part(end,.12,.92))+.37*ease(part(end,.63,1)));
     ellipse(bx,afloat+13,164*bs,10,"rgba(17,94,83,.23)");
-    ring(bx,afloat+12,164+5*Math.sin(t),.66);
+    ring(bx,afloat+12,164*bs+5*Math.sin(t),.66);
     const flying=[];
     local(bx,by,bs,tilt,()=>{
       hullBack();
@@ -105,13 +111,13 @@ window.PondScene = (() => {
         const x=d.x+s.shift*12, y=d.y;
         if(p<1){flying.push([d,p,x,y]);continue}
         const fall=Math.max(0,Math.sin((t-d.born-.44)*18))*Math.max(0,1-(t-d.born-.44)*4);
-        duck(x,y-3*fall,d.size,Math.sin(d.seed+t*2)*.045-tilt*.47,d.heavy);
+        duck(x,y-3*fall,d.size/bs,Math.sin(d.seed+t*2)*.045-tilt*.47,d.heavy);
       }
       hullFront();
     });
     for(const [d,p,x,y] of flying){
       const tx=bx+bs*(x*Math.cos(tilt)-y*Math.sin(tilt)),ty=by+bs*(x*Math.sin(tilt)+y*Math.cos(tilt));
-      duck(mix(117,tx,p),mix(afloat-35,ty,p)-91*Math.sin(PI*p),d.size*bs,Math.sin(PI*p)*-.18,d.heavy);
+      duck(mix(112*pierScale,tx,p),mix(afloat-11-21*pierScale-8*d.size,ty,p)-80*Math.sin(PI*p),d.size,Math.sin(PI*p)*-.18,d.heavy);
     }
     const water=ctx.createLinearGradient(0,afloat,0,afloat+H*.65);
     water.addColorStop(0,"rgba(51,145,131,"+(.15+.58*ease(part(end,.02,.55)))+")");
@@ -149,8 +155,8 @@ window.PondScene = (() => {
       }
       if(end>.49){
         const up=ease(part(end,.49,.8));const y=afloat+29-35*up+2*Math.sin(wall*.002);
-        duck(bx+145,y,.62,.04);
-        if(end>.83){ctx.fillStyle="#fff8d9";ctx.font="bold 17px sans-serif";ctx.textAlign="center";ctx.fillText("꽥.",bx+155,y-27)}
+        duck(bx+100*bs,y,s.duck.size,.04,s.duck.heavy);
+
       }
     }
     ctx.restore();
