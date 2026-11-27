@@ -11,6 +11,7 @@
   const crew = document.getElementById("crew");
   const clamp = value => Math.min(1, Math.max(0, value));
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const turnTempo = 1.15;
 
   // Each group gets a fixed hull and room for a long first hold.
   const boatsByGroup = {
@@ -73,6 +74,7 @@
     }
     if (!endingAudio.src) return;
     endingAudio.muted = false;
+    endingAudio.playbackRate = turnTempo;
     endingAudio.currentTime = Math.min(elapsed, endingLength);
     endingAudio.play().catch(() => {});
   }
@@ -301,7 +303,11 @@
       introTitle.hidden = true;
       chooseGroup();
     }
-    if (!document.hidden && !help.open) update(dt);
+    if (!document.hidden && !help.open) {
+      // Advance the active turn and its ending audio at the same tempo.
+      const turnInProgress = state.mode === "hold" || state.mode === "balance" || inEnding();
+      update(dt * (turnInProgress ? turnTempo : 1));
+    }
     if (inEnding() && !endingAudio.paused && endingAudio.readyState >= 2 &&
         Math.abs(endingAudio.currentTime - elapsed) > .20) {
       endingAudio.currentTime = Math.min(elapsed, endingLength);
