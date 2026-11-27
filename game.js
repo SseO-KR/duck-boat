@@ -118,7 +118,7 @@
     const boat = pickDifferent(boats, state?.boat);
     const duck = pickDifferent(ducks, state?.duck);
     state = {boat, duck, clock: 1, quiet: reducedMotion, ducks: [], mass: 0, moment: 0, ratio: 0,
-      angle: 0, shift: 0, focus: 0, sink: 0, lastBeat: -1};
+      strain: 0, angle: 0, shift: 0, focus: 0, sink: 0, lastBeat: -1};
     // Seats are boat-local; duck dimensions and weight are independent of hull size.
     state.columns = Math.max(3, Math.floor(boat.scale * 242 / (duck.size * 39)));
     owner = null;
@@ -138,6 +138,8 @@
     crew.hidden = true;
     surface.disabled = false;
     board(-2); board(-2);
+    // Keep a consistent low side as players pass the boat around.
+    state.direction = state.moment >= 0 ? 1 : -1;
     setMode("ready", "Hold anywhere on the water to board ducks.");
     surface.focus({preventScroll: true});
   }
@@ -152,6 +154,7 @@
     s.mass += s.duck.mass;
     s.moment += x * s.duck.mass;
     s.ratio = (s.mass + Math.abs(s.moment) / 420) / s.capacity;
+    s.strain = clamp(s.ratio) ** 1.8;
   }
   function begin(id) {
     if (state.mode !== "ready" || owner !== null) return false;
@@ -166,8 +169,7 @@
     owner = null;
     s.doomed = s.ratio >= 1;
     s.releaseAngle = s.angle;
-    s.direction = s.moment >= 0 ? 1 : -1;
-    s.duration = 4.05 + 1.95 * clamp((s.ratio - .2) / .8);
+    s.duration = 1.15 + 4.85 * s.strain;
     s.lastBeat = -1;
     setMode("balance", "The boat is rocking.");
   }
@@ -205,25 +207,32 @@
   function update(dt) {
     const s = state;
     elapsed += dt; runTime += dt;
-    const speed = s.mode === "balance" ? .32 : s.mode === "sinking" ? .46 : 1;
+    const speed = s.mode === "balance" ? .82 - .50 * s.strain : s.mode === "sinking" ? .46 : 1;
     s.clock += dt * speed;
     switch (s.mode) {
-      case "hold":
-        while (elapsed >= nextDuck && s.ducks.length < s.limit) {
+      case "ready":
+      case "hold": {
+        const boarding = s.mode === "hold";
+        while (boarding && elapsed >= nextDuck && s.ducks.length < s.limit) {
           board(s.clock); nextDuck += .077;
           if (s.ducks.length % 3 === 0) note(450 + Math.random()*210, 880, .06, 0, .018);
         }
-        s.angle += (Math.sin(s.clock*6)*.021 + s.moment/s.mass*.0017 - s.angle) * Math.min(1, dt*4);
+        const lean = s.direction * s.strain * (boarding ? .27 : .16);
+        const sway = Math.sin(s.clock * 2.6) * s.strain * (boarding ? .105 : .06);
+        const target = lean + sway * (s.quiet ? .24 : 1);
+        s.angle += (target - s.angle) * (1 - Math.exp(-dt * 6));
         break;
+      }
       case "balance": {
         const p = clamp(elapsed / s.duration);
-        const maxAngle = (.09 + .39 * clamp(s.ratio)) * s.direction;
+        const maxAngle = (.014 + .56 * s.strain) * s.direction * (s.quiet ? .68 : 1);
         const q = PondScene.sequence(p, [[0,0],[.20,.52],[.37,.90],[.56,.26],[.65,.31],[.86,1.06],[.92,1.04],[1,.11]]);
         s.angle = s.releaseAngle*(1-clamp(p*4)) + maxAngle*q;
-        s.shift = Math.sin(s.angle)*1.4; s.focus = clamp(p*4);
+        s.shift = Math.sin(s.angle)*1.4; s.focus = clamp(p*4) * s.strain;
         const beat = p>.78 ? 2 : p>.52 ? 1 : p>.23 ? 0 : -1;
         if (beat !== s.lastBeat) {
-          s.lastBeat = beat; note(92,49,.2,0,.09); note(77,44,.14,.15,.045);
+          s.lastBeat = beat;
+          note(92,49,.2,0,.09*s.strain); note(77,44,.14,.15,.045*s.strain);
         }
         if (p === 1) {
           s.beforeSink = s.angle;
@@ -234,7 +243,7 @@
       }
       case "safe":
         s.endingTime = elapsed;
-        s.angle *= Math.exp(-dt*5); s.shift *= Math.exp(-dt*5); s.focus = Math.max(0,1-elapsed);
+        s.angle *= Math.exp(-dt*5); s.shift *= Math.exp(-dt*5); s.focus *= Math.exp(-dt*5);
         if (elapsed >= 1.05) setMode("ready", "Pass the device. Hold to board more ducks.");
         break;
       case "sinking":

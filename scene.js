@@ -144,7 +144,8 @@ window.PondScene = (() => {
         s.duck.size,Math.sin(t+i)*.04,s.duck.heavy);
     }
     const impact=s.ducks.reduce((sum,d)=>{const v=t-d.born-.44;return v>0&&v<1?sum+Math.sin(v*14)*Math.exp(-v*4)*d.mass:sum},0);
-    const tilt=s.angle+Math.sin(t*1.24)*.012+(end<.02?impact*.009:0);
+    const landingRoll=end<.02 ? Math.tanh(impact)*(.006+.014*s.strain) : 0;
+    const tilt=s.angle+Math.sin(t*1.24)*.004+landingRoll;
     const bs=s.boat.scale;
     const bx=W*.557,by=afloat-29*bs+Math.min(r,1.5)*12+Math.sin(t*1.7)*2+H*(.49*ease(part(end,.12,.92))+.37*ease(part(end,.63,1)));
     ellipse(bx,afloat+13,164*bs,10,"rgba(17,94,83,.23)");
