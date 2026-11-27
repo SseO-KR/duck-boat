@@ -22,7 +22,7 @@ jobs:
         run: |
           node --check scene.js
           node --check game.js
-          for asset in style.css pond.jpg hold.webp release.webp false-clear.m4a; do
+          for asset in style.css pond.jpg hold.webp release.webp ending.webp false-clear.m4a; do
             test -s "$asset"
           done
       - name: Open the game in Chrome
