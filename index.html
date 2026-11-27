@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#63b39e">
 <link rel="icon" href="data:,">
 <title>Duck Boat</title>
+<link rel="preload" as="image" href="pond.jpg">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,7 +17,9 @@
     <span class="cue" aria-hidden="true"><i class="touch-mark"></i><span>Touching</span></span>
     <span class="replay" aria-hidden="true"><i></i></span>
   </button>
-  <section id="crew" aria-labelledby="crew-title">
+  <canvas id="intro-frame" hidden aria-hidden="true"></canvas>
+  <h1 id="intro-title" hidden>Duck Boat</h1>
+  <section id="crew" hidden aria-labelledby="crew-title">
     <h1 id="crew-title">How many people?</h1>
     <div class="crew-options">
       <button type="button" data-group="small">Up to 4</button>
@@ -24,9 +27,38 @@
       <button type="button" data-group="large">8+</button>
     </div>
   </section>
-  <button type="button" id="sound" aria-label="Turn sound on" aria-pressed="false"><i class="note" aria-hidden="true"></i></button>
+  <div id="game-tools" hidden>
+    <button type="button" id="sound" aria-label="Turn sound on" aria-pressed="false"><i class="note" aria-hidden="true"></i></button>
+    <button type="button" id="help-button" aria-label="How to play" aria-haspopup="dialog" aria-controls="help">?</button>
+  </div>
   <span class="sr" role="status" id="announce"></span>
 </main>
+<dialog id="help" aria-label="How to play">
+  <button type="button" id="help-close" aria-label="Close help" autofocus>×</button>
+  <div class="help-steps">
+    <figure>
+      <img src="hold.webp" width="800" height="384" loading="lazy" alt="A duck jumps from the dock into the boat.">
+      <figcaption>
+        <svg aria-hidden="true" viewBox="0 0 48 48">
+          <circle cx="23" cy="17" r="13"/><circle cx="23" cy="17" r="8"/>
+          <path class="hand" d="M20 30V17a3 3 0 0 1 6 0v9a3 3 0 0 1 5 1 3 3 0 0 1 5 2 3 3 0 0 1 5 2v4a11 11 0 0 1-11 11h-3a10 10 0 0 1-8-4l-6-8a3 3 0 0 1 5-4l2 2Z"/>
+        </svg>
+        Hold
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="release.webp" width="800" height="384" loading="lazy" alt="The boat rocks when you release. If too many ducks are aboard, it sinks.">
+      <figcaption>
+        <svg aria-hidden="true" viewBox="0 0 48 48">
+          <ellipse cx="19" cy="42" rx="13" ry="4"/>
+          <path class="lift" d="M19 40v-9m-4 4 4-4 4 4"/>
+          <path class="hand" d="M34 4c6 3 8 9 6 15l-2 5a2.6 2.6 0 0 1-5-1 2.6 2.6 0 0 1-5 0 2.6 2.6 0 0 1-5-1l-2 5a3 3 0 0 1-5-3l4-12-5 3a3 3 0 0 1-3-5l9-6c4-2 9-2 13 0Z"/>
+        </svg>
+        Release
+      </figcaption>
+    </figure>
+  </div>
+</dialog>
 <script src="scene.js"></script><script src="game.js"></script>
 </body>
 </html>
