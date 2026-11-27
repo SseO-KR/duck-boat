@@ -7,25 +7,20 @@
   const clamp = value => Math.min(1, Math.max(0, value));
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  const boats = [
-    {scale: 0.74, capacity: 17}, {scale: 1.04, capacity: 29}, {scale: 1.36, capacity: 43}
-  ];
+  // Each group gets a fixed hull and room for a long first hold.
+  const boatsByGroup = {
+    small: {scale: 0.74, minDucks: 100, maxDucks: 140},
+    medium: {scale: 1.04, minDucks: 220, maxDucks: 280},
+    large: {scale: 1.36, minDucks: 330, maxDucks: 420}
+  };
   const ducks = [
     {size: 0.43, mass: 0.65}, {size: 0.71, mass: 1.12}, {size: 1.08, mass: 2.15, heavy: true}
   ];
-  const groupLoads = {
-    // Allow for a long first hold (3–5 seconds), followed by shorter turns.
-    small: [100, 140],
-    medium: [220, 280],
-    large: [330, 420]
-  };
-  function boardingCapacity(boat, duck, group) {
-    // Keep the full spread of hull sizes and duck weights inside this group's range.
-    const lightLoad = boats[0].capacity / ducks.at(-1).mass;
-    const heavyLoad = boats.at(-1).capacity / ducks[0].mass;
-    const fraction = (boat.capacity / duck.mass - lightLoad) / (heavyLoad - lightLoad);
-    const [minimum, maximum] = groupLoads[group];
-    return Math.round(minimum + fraction * (maximum - minimum)) * duck.mass;
+  const maxSinkOffset = 10;
+  function nominalDuckCount(boat, duck) {
+    const heaviest = ducks.at(-1).mass, lightest = ducks[0].mass;
+    const fraction = (1 / duck.mass - 1 / heaviest) / (1 / lightest - 1 / heaviest);
+    return Math.round(boat.minDucks + fraction * (boat.maxDucks - boat.minDucks));
   }
   function pickDifferent(tiers, previous) {
     const choices = tiers.filter(tier => tier !== previous);
@@ -115,12 +110,10 @@
   }
   let lastGroupButton = null;
   function chooseGroup() {
-    const boat = pickDifferent(boats, state?.boat);
+    const boat = state?.boat ?? boatsByGroup.medium;
     const duck = pickDifferent(ducks, state?.duck);
-    state = {boat, duck, clock: 1, quiet: reducedMotion, ducks: [], mass: 0, moment: 0, ratio: 0,
+    state = {boat, duck, columns: 1, clock: 1, quiet: reducedMotion, ducks: [], load: 0, moment: 0, ratio: 0,
       strain: 0, angle: 0, shift: 0, focus: 0, sink: 0, lastBeat: -1};
-    // Seats are boat-local; duck dimensions and weight are independent of hull size.
-    state.columns = Math.max(3, Math.floor(boat.scale * 242 / (duck.size * 39)));
     owner = null;
     surface.disabled = true;
     crew.hidden = false;
@@ -132,8 +125,15 @@
   }
   function startRound(button) {
     if (state.mode !== "group") return;
-    state.capacity = boardingCapacity(state.boat, state.duck, button.dataset.group);
-    state.limit = Math.ceil(1.15 * state.capacity / state.duck.mass);
+    const boat = boatsByGroup[button.dataset.group], duck = state.duck;
+    state.boat = boat;
+    state.columns = Math.max(3, Math.floor(boat.scale * 242 / (duck.size * 39)));
+    const nominalCount = nominalDuckCount(boat, duck);
+    const offset = Math.floor(Math.random() * (2 * maxSinkOffset + 1)) - maxSinkOffset;
+    // Motion follows the rated load. Only the verdict uses the hidden, round-long threshold.
+    state.ratedCapacity = nominalCount * state.duck.mass;
+    state.sinkingCapacity = (nominalCount + offset) * state.duck.mass;
+    state.limit = Math.max(Math.ceil(1.15 * nominalCount), nominalCount + maxSinkOffset);
     lastGroupButton = button;
     crew.hidden = true;
     surface.disabled = false;
@@ -151,9 +151,9 @@
     const x = (slot / (columns - 1) - .5) * 212 + (Math.random() - .5) * 5;
     const y = -22 - (row * 23 + 6) * s.duck.size / s.boat.scale + (Math.random() - .5) * 3;
     s.ducks.push({...s.duck, x, y, born, seed: Math.random() * 6});
-    s.mass += s.duck.mass;
     s.moment += x * s.duck.mass;
-    s.ratio = (s.mass + Math.abs(s.moment) / 420) / s.capacity;
+    s.load = s.ducks.length * s.duck.mass + Math.abs(s.moment) / 420;
+    s.ratio = s.load / s.ratedCapacity;
     s.strain = clamp(s.ratio) ** 1.8;
   }
   function begin(id) {
@@ -167,7 +167,7 @@
     const s = state;
     if (s.mode !== "hold" || id !== owner) return;
     owner = null;
-    s.doomed = s.ratio >= 1;
+    s.doomed = s.load >= s.sinkingCapacity;
     s.releaseAngle = s.angle;
     s.duration = 1.15 + 4.85 * s.strain;
     s.lastBeat = -1;
