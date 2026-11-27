@@ -9,32 +9,44 @@ window.PondScene = (() => {
   const part = (v,a,b) => clamp((v-a)/(b-a));
   const ease = n => n*n*(3-2*n);
   const mix = (a,b,n) => a+(b-a)*n;
-  function ellipse(x,y,rx,ry,color,angle=0) {
-    ctx.fillStyle=color; ctx.beginPath(); ctx.ellipse(x,y,rx,ry,angle,0,2*PI); ctx.fill();
+  function drawingTools(context) {
+    function ellipse(x,y,rx,ry,color,angle=0) {
+      context.fillStyle=color; context.beginPath(); context.ellipse(x,y,rx,ry,angle,0,2*PI); context.fill();
+    }
+    function path(commands, fill, stroke, width=1) {
+      context.beginPath();
+      for(const [fn,...args] of commands) context[fn](...args);
+      if(fill){context.fillStyle=fill;context.fill()}
+      if(stroke){context.lineWidth=width;context.strokeStyle=stroke;context.lineCap="round";context.lineJoin="round";context.stroke()}
+    }
+    return {ellipse,path};
   }
-  function path(commands, fill, stroke, width=1) {
-    ctx.beginPath();
-    for(const [fn,...args] of commands) ctx[fn](...args);
-    if(fill){ctx.fillStyle=fill;ctx.fill()}
-    if(stroke){ctx.lineWidth=width;ctx.strokeStyle=stroke;ctx.lineCap="round";ctx.lineJoin="round";ctx.stroke()}
-  }
+  const {ellipse,path}=drawingTools(ctx);
   const M=(x,y)=>["moveTo",x,y], L=(x,y)=>["lineTo",x,y];
   const C=(a,b,c,d,x,y)=>["bezierCurveTo",a,b,c,d,x,y], Z=["closePath"];
   function line(x,y,x2,y2,shade,width){path([M(x,y),L(x2,y2)],null,shade,width)}
   function local(x,y,scale,angle,fn){ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.scale(scale,scale);fn();ctx.restore()}
+  function makeDuckSprite(heavy) {
+    const sprite=document.createElement("canvas");
+    sprite.width=200; sprite.height=168;
+    const pen=sprite.getContext("2d");
+    pen.setTransform(4,0,0,4,100,108);
+    const {ellipse,path}=drawingTools(pen);
+    const plumage=heavy?"#e6a333":"#ffd259";
+    path([M(-18,-6),C(-23,-17,-23,-17,-21,-7),C(-23,7,-9,13,4,10),C(18,9,19,-1,12,-5),Z],plumage,"#aa7833",1.3);
+    ellipse(8,-10,10.9,10.8,plumage);
+    path([M(0,-18),C(0,-25,5,-22,6,-20),C(8,-25,12,-23,11,-20)],plumage);
+    ellipse(17,-8,6.8,2.8,"#e98037",.12);
+    ellipse(13,-12.5,1.8,2.0,"#213c34");
+    ellipse(13.5,-13.1,.55,.55,"#fff");
+    ellipse(11,-6,3,1.5,"#f3a056");
+    path([M(-14,-3),C(-9,-6,-5,-4,1,-1),C(-1,7,-11,9,-15,3)],heavy?"#c88a2c":"#edb83b");
+    path([M(-13,-3),C(-9,-4,-5,-3,-2,-1)],null,"#ffe697",1.3);
+    return sprite;
+  }
+  const lightDuck=makeDuckSprite(false), heavyDuck=makeDuckSprite(true);
   function duck(x,y,size,angle=0,heavy=false) {
-    local(x,y,size,angle,()=>{
-      const plumage=heavy?"#e6a333":"#ffd259";
-      path([M(-18,-6),C(-23,-17,-23,-17,-21,-7),C(-23,7,-9,13,4,10),C(18,9,19,-1,12,-5),Z],plumage,"#aa7833",1.3);
-      ellipse(8,-10,10.9,10.8,plumage);
-      path([M(0,-18),C(0,-25,5,-22,6,-20),C(8,-25,12,-23,11,-20)],plumage);
-      ellipse(17,-8,6.8,2.8,"#e98037",.12);
-      ellipse(13,-12.5,1.8,2.0,"#213c34");
-      ellipse(13.5,-13.1,.55,.55,"#fff");
-      ellipse(11,-6,3,1.5,"#f3a056");
-      path([M(-14,-3),C(-9,-6,-5,-4,1,-1),C(-1,7,-11,9,-15,3)],heavy?"#c88a2c":"#edb83b");
-      path([M(-13,-3),C(-9,-4,-5,-3,-2,-1)],null,"#ffe697",1.3);
-    });
+    local(x,y,size,angle,()=>ctx.drawImage(heavy?heavyDuck:lightDuck,-25,-27,50,42));
   }
   function pier(y) {
     for(const x of [11,66,124]){
@@ -137,22 +149,34 @@ window.PondScene = (() => {
     const bx=W*.557,by=afloat-29*bs+Math.min(r,1.5)*12+Math.sin(t*1.7)*2+H*(.49*ease(part(end,.12,.92))+.37*ease(part(end,.63,1)));
     ellipse(bx,afloat+13,164*bs,10,"rgba(17,94,83,.23)");
     ring(bx,afloat+12,164*bs+5*Math.sin(t),.66);
-    const flying=[];
-    // A packed flock settles closer together, keeping the upper rows in view.
-    const stackHeight = s.ducks.length / s.columns * 23 * s.duck.size;
-    const stackSpacing = Math.min(1, Math.min(132 * bs, H * .27) / Math.max(1, stackHeight));
+    const lastRow = Math.max(0, Math.ceil(s.ducks.length / s.columns) - 1);
+    const rowHeight = 23 * s.duck.size;
+    const heightLimit = Math.min((88 + 122 * clamp(r)) * bs, H * .34);
+    const pileHeight = Math.min(lastRow * rowHeight, heightLimit);
+    const visibleGaps = Math.min(lastRow, Math.floor(pileHeight / (rowHeight * .88)));
+    const rowLift = lastRow ? (rowHeight - pileHeight / lastRow) / bs : 0;
+    const seatOffset = band => s.shift*12 + (band%2-.5)*Math.min(8,50/s.columns);
     local(bx,by,bs,tilt,()=>{
       hullBack();
-      for(const d of s.ducks){
-        const p=clamp((t-d.born)/.44);
-        const x=d.x+s.shift*12, y=-22+(d.y+22)*stackSpacing;
-        if(p<1){flying.push([d,p,x,y]);continue}
-        const fall=Math.max(0,Math.sin((t-d.born-.44)*18))*Math.max(0,1-(t-d.born-.44)*4);
-        duck(x,y-3*fall,d.size/bs,Math.sin(d.seed+t*2)*.045-tilt*.47,d.heavy);
+      // Draw the rear rows first. At high loads, intervening rows sit behind the visible flock.
+      for(let band=visibleGaps;band>=0;band--){
+        const row=visibleGaps ? Math.round(band*lastRow/visibleGaps) : 0;
+        const start=row*s.columns, stop=Math.min(start+s.columns,s.ducks.length);
+        for(let i=start;i<stop;i++){
+          const d=s.ducks[i], p=clamp((t-d.born)/.44);
+          if(p<1)continue;
+          const fall=Math.max(0,Math.sin((t-d.born-.44)*18))*Math.max(0,1-(t-d.born-.44)*4);
+          duck(d.x+seatOffset(band),d.y+row*rowLift-3*fall,d.size/bs,Math.sin(d.seed+t*2)*.045-tilt*.47,d.heavy);
+        }
       }
       hullFront();
     });
-    for(const [d,p,x,y] of flying){
+    for(let i=s.ducks.length-1;i>=0;i--){
+      const d=s.ducks[i],p=clamp((t-d.born)/.44);
+      if(p===1)break;
+      const row=Math.floor(i/s.columns);
+      const band=lastRow?Math.round(row*visibleGaps/lastRow):0;
+      const x=d.x+seatOffset(band),y=d.y+row*rowLift;
       const tx=bx+bs*(x*Math.cos(tilt)-y*Math.sin(tilt)),ty=by+bs*(x*Math.sin(tilt)+y*Math.cos(tilt));
       duck(mix(112*pierScale,tx,p),mix(afloat-11-21*pierScale-8*d.size,ty,p)-80*Math.sin(PI*p),d.size,Math.sin(PI*p)*-.18,d.heavy);
     }

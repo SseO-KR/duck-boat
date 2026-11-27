@@ -14,9 +14,10 @@
     {size: 0.43, mass: 0.65}, {size: 0.71, mass: 1.12}, {size: 1.08, mass: 2.15, heavy: true}
   ];
   const groupLoads = {
-    small: [32, 46],
-    medium: [58, 80],
-    large: [90, 124]
+    // Allow for a long first hold (3–5 seconds), followed by shorter turns.
+    small: [100, 140],
+    medium: [220, 280],
+    large: [330, 420]
   };
   function boardingCapacity(boat, duck, group) {
     // Keep the full spread of hull sizes and duck weights inside this group's range.
