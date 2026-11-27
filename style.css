@@ -5,8 +5,7 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;overscroll-behavior:no
 button{font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
 #water{display:block;position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;overflow:hidden;border:0;border-radius:0;background:#79c5af;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:pointer}
 #scene{display:block;width:100%;height:100%}
-#duckCount,#sound{position:absolute;top:max(18px,env(safe-area-inset-top));border:1.5px solid #28574a;background:#fff6d9;box-shadow:0 3px 0 #24584b66}
-#duckCount{left:50%;transform:translateX(-50%);min-width:62px;padding:4px 15px 6px;border-radius:16px;text-align:center;font-weight:850;font-size:clamp(23px,3vw,32px);line-height:1.05;font-variant-numeric:tabular-nums;pointer-events:none}
+#sound{position:absolute;top:max(18px,env(safe-area-inset-top));border:1.5px solid #28574a;background:#fff6d9;box-shadow:0 3px 0 #24584b66}
 #sound{right:max(18px,env(safe-area-inset-right));width:46px;height:46px;border-radius:50%;display:grid;place-items:center;cursor:pointer;touch-action:manipulation}
 .note{position:relative;width:17px;height:16px;border:solid currentColor;border-width:4px 2.5px 0 2.5px;transform:skewY(-9deg)}
 .note:before,.note:after{content:"";position:absolute;width:8px;height:6px;background:currentColor;border-radius:50%;bottom:-2px}
@@ -26,5 +25,5 @@ button{font:inherit;color:inherit;-webkit-tap-highlight-color:transparent}
 [data-state=balance] #water,[data-state=sinking] #water{cursor:default}
 #water:focus-visible{outline:3px solid #fff0ad;outline-offset:-6px}#sound:focus-visible{outline:3px solid #184d40;outline-offset:3px}
 .sr{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}
-@media(max-height:480px){.cue,.replay{bottom:max(4%,env(safe-area-inset-bottom))}#duckCount,#sound{top:max(8px,env(safe-area-inset-top))}.replay{width:48px;height:48px}}
+@media(max-height:480px){.cue,.replay{bottom:max(4%,env(safe-area-inset-bottom))}#sound{top:max(8px,env(safe-area-inset-top))}.replay{width:48px;height:48px}}
 @media(prefers-reduced-motion:reduce){.touch-mark:after{animation:none}.cue{transition:none}}

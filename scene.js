@@ -67,6 +67,40 @@ window.PondScene = (() => {
     for(let i=1;i<keys.length;i++)if(progress<=keys[i][0])return mix(keys[i-1][1],keys[i][1],ease(part(progress,keys[i-1][0],keys[i][0])));
     return keys.at(-1)[1];
   }
+  function verdict(s, width, height) {
+    if (!["safe", "sinking", "lost"].includes(s.mode)) return;
+    const failed = s.mode !== "safe";
+    const t = s.mode === "lost" ? 4.9 : s.endingTime;
+    const flip = failed ? part(t, 1.21, 1.46) : 0;
+    const red = flip >= .5;
+    const size = s.quiet ? 1 : sequence(t,
+      [[0,.02],[.26,1.18],[.43,1],[1.22,1],[1.42,1.14],[1.6,1],[3.4,1],[4.18,.76]]);
+    const cream = "#fff1c8";
+    const x = width / 2, y = height * .292;
+    local(x, y, size * Math.min(1, height / 310), red ? .09 : -.08, () => {
+      if (!s.quiet) ctx.scale(Math.max(.06, Math.abs(Math.cos(PI*flip))), 1);
+      ellipse(0, 3, 42, 42, red ? "#8e3e36" : "#2f6155");
+      ellipse(0, 0, 41, 41, red ? "#da5446" : "#4b9a70");
+      ctx.beginPath(); ctx.arc(0,0,41,0,2*PI); ctx.strokeStyle = cream; ctx.lineWidth = 3; ctx.stroke();
+      if (red) {
+        line(-14,-14,14,14,cream,7); line(14,-14,-14,14,cream,7);
+      } else {
+        path([M(-19,0),L(-6,13),L(21,-15)],null,cream,8);
+      }
+    });
+    if (s.quiet) return;
+    const burst = red ? part(t,1.33,1.68) : part(t,0,.65);
+    if (burst > 0 && burst < 1) {
+      ctx.save(); ctx.globalAlpha = Math.sin(PI*burst);
+      const n = red ? 12 : 9;
+      for (let i=0;i<n;i++) {
+        const a = i*2*PI/n, r = 43 + 8*burst;
+        line(x+Math.cos(a)*r,y+Math.sin(a)*r,x+Math.cos(a)*(r+11),y+Math.sin(a)*(r+11),
+          red ? "#ffb454" : cream,2.4);
+      }
+      ctx.restore();
+    }
+  }
   function draw(s,wall) {
     const w=canvas.clientWidth,h=canvas.clientHeight;if(!w||!h)return;
     const dpr=Math.min(2,window.devicePixelRatio||1);
@@ -160,6 +194,7 @@ window.PondScene = (() => {
       }
     }
     ctx.restore();
+    verdict(s,W,H);
   }
   return {draw,sequence};
 })();

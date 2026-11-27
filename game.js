@@ -2,7 +2,6 @@
   const game = document.getElementById("game");
   const surface = document.getElementById("water");
   const sound = document.getElementById("sound");
-  const count = document.getElementById("duckCount");
   const status = document.getElementById("announce");
   const clamp = value => Math.min(1, Math.max(0, value));
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -19,7 +18,38 @@
   }
 
   let state, owner = null, elapsed = 0, nextDuck = 0, runTime = 0, lastFrame = performance.now();
+  const endingAudio = new Audio();
+  endingAudio.preload = "auto";
+  let endingUnlocked = false;
   let audio, soundOn = false;
+  const endingLength = 4.90;
+  const inEnding = () => state?.mode === "safe" || state?.mode === "sinking";
+
+  async function loadEndingAudio() {
+    const file = "false-clear.m4a";
+    let src = file;
+    if (location.protocol !== "file:") {
+      try {
+        // A buffered clip can seek on unmute even when the host lacks byte-range support.
+        const response = await fetch(file);
+        if (response.ok) src = URL.createObjectURL(await response.blob());
+      } catch { /* The media element can still load the file directly. */ }
+    }
+    endingAudio.src = src;
+    if (inEnding()) syncEndingAudio();
+  }
+
+  function syncEndingAudio() {
+    if (!soundOn || document.hidden || !inEnding()) {
+      endingAudio.pause();
+      return;
+    }
+    if (!endingAudio.src) return;
+    endingAudio.muted = false;
+    endingAudio.currentTime = Math.min(elapsed, endingLength);
+    endingAudio.play().catch(() => {});
+  }
+
   try { soundOn = localStorage.getItem("pond.sound") === "true"; } catch {}
   function updateSound() {
     sound.setAttribute("aria-pressed", String(soundOn));
@@ -27,6 +57,14 @@
   }
   function wakeAudio() {
     if (!soundOn) return;
+    // Unlock this media element from a gesture before the delayed verdict on mobile.
+    if (!endingUnlocked && endingAudio.src && !inEnding()) {
+      endingAudio.muted = true;
+      endingAudio.play().then(() => {
+        endingUnlocked = true;
+        if (!inEnding() || !soundOn || document.hidden) endingAudio.pause();
+      }).catch(() => {});
+    }
     try {
       const Audio = window.AudioContext || window.webkitAudioContext;
       if (Audio) { audio ??= new Audio(); audio.resume().catch(() => {}); }
@@ -47,7 +85,9 @@
   sound.onclick = () => {
     soundOn = !soundOn;
     try { localStorage.setItem("pond.sound", String(soundOn)); } catch {}
-    updateSound(); wakeAudio(); note(440, 660, .1);
+    updateSound(); wakeAudio();
+    if (inEnding() || !soundOn) syncEndingAudio();
+    if (!inEnding()) note(440, 660, .1);
   };
 
   function setMode(mode, announcement = "") {
@@ -55,6 +95,8 @@
     elapsed = 0;
     surface.setAttribute("aria-label", mode === "lost" ? "Play again" : "Hold to board ducks. Release to test the boat.");
     status.textContent = announcement;
+    state.endingTime = 0;
+    syncEndingAudio();
   }
   function newRound() {
     const boat = pickDifferent(boats, state?.boat);
@@ -79,11 +121,10 @@
     s.mass += s.duck.mass;
     s.moment += x * s.duck.mass;
     s.ratio = (s.mass + Math.abs(s.moment) / 420) / s.boat.capacity;
-    count.value = String(s.ducks.length);
   }
   function begin(id) {
     if (state.mode !== "ready" || owner !== null) return false;
-    owner = id; wakeAudio(); setMode("hold");
+    owner = id; setMode("hold"); wakeAudio();
     board(state.clock - .04); board(state.clock + .04);
     nextDuck = .135; note(530, 730, .055, 0, .025);
     return true;
@@ -125,7 +166,10 @@
   });
   function interrupt() { release(owner); lastFrame = performance.now(); }
   window.addEventListener("blur", interrupt);
-  document.addEventListener("visibilitychange", interrupt);
+  document.addEventListener("visibilitychange", () => {
+    interrupt();
+    syncEndingAudio();
+  });
 
   function update(dt) {
     const s = state;
@@ -143,7 +187,7 @@
       case "balance": {
         const p = clamp(elapsed / s.duration);
         const maxAngle = (.09 + .39 * clamp(s.ratio)) * s.direction;
-        const q = PondScene.sequence(p, [[0,0],[.20,.52],[.37,.90],[.56,.26],[.65,.31],[.86,1.06],[.92,1.04],[1,s.doomed ? 1.19 : .11]]);
+        const q = PondScene.sequence(p, [[0,0],[.20,.52],[.37,.90],[.56,.26],[.65,.31],[.86,1.06],[.92,1.04],[1,.11]]);
         s.angle = s.releaseAngle*(1-clamp(p*4)) + maxAngle*q;
         s.shift = Math.sin(s.angle)*1.4; s.focus = clamp(p*4);
         const beat = p>.78 ? 2 : p>.52 ? 1 : p>.23 ? 0 : -1;
@@ -152,20 +196,23 @@
         }
         if (p === 1) {
           s.beforeSink = s.angle;
-          if (s.doomed) { setMode("sinking"); note(184,41,.92,0,.10,"triangle"); }
-          else { setMode("safe","The boat held."); note(392,494,.12); note(494,587,.16,.12); }
+          if (s.doomed) setMode("sinking", "The boat steadies for a moment.");
+          else setMode("safe", "The boat held.");
         }
         break;
       }
       case "safe":
+        s.endingTime = elapsed;
         s.angle *= Math.exp(-dt*5); s.shift *= Math.exp(-dt*5); s.focus = Math.max(0,1-elapsed);
         if (elapsed >= 1.05) setMode("ready", "Pass the device. Hold to board more ducks.");
         break;
       case "sinking":
-        s.sink = clamp(elapsed / 3.45);
-        s.angle = s.beforeSink + s.direction * PondScene.sequence(s.sink, [[0,0],[.18,-.09],[.34,.22],[.68,.47],[1,.59]]);
-        if (s.sink > .84 && !s.quacked) { s.quacked = true; note(620,330,.125,0,.045,"sawtooth"); }
-        if (s.sink === 1) setMode("lost", "The boat sank. The last player loses. Tap to play again.");
+        s.endingTime = elapsed;
+        // Relative to the preview's green check: flip at 1.21s, begin sinking at 1.32s.
+        s.sink = PondScene.sequence(elapsed, [[1.32,0],[4.08,1]]);
+        s.angle = s.beforeSink + s.direction * PondScene.sequence(elapsed,
+          [[0,0],[.37,-.10],[1.05,-.09],[1.31,.03],[1.75,.59],[4.08,.91]]);
+        if (elapsed >= endingLength) setMode("lost", "The boat sank. The last player loses. Tap to play again.");
         break;
     }
   }
@@ -173,7 +220,11 @@
     const dt = Math.min(.1,Math.max(0,(now-lastFrame)/1000));
     lastFrame = now;
     if (!document.hidden) update(dt);
+    if (inEnding() && !endingAudio.paused && endingAudio.readyState >= 2 &&
+        Math.abs(endingAudio.currentTime - elapsed) > .20) {
+      endingAudio.currentTime = Math.min(elapsed, endingLength);
+    }
     PondScene.draw(state,runTime*1000); requestAnimationFrame(frame);
   }
-  updateSound(); newRound(); requestAnimationFrame(frame);
+  updateSound(); newRound(); loadEndingAudio(); requestAnimationFrame(frame);
 })();
