@@ -46,7 +46,11 @@ window.PondScene = (() => {
   }
   const lightDuck=makeDuckSprite(false), heavyDuck=makeDuckSprite(true);
   function duck(x,y,size,angle=0,heavy=false) {
-    local(x,y,size,angle,()=>ctx.drawImage(heavy?heavyDuck:lightDuck,-25,-27,50,42));
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(angle);
+    ctx.drawImage(heavy?heavyDuck:lightDuck,-25*size,-27*size,50*size,42*size);
+    ctx.restore();
   }
   function pier(y) {
     for(const x of [11,66,124]){
@@ -113,7 +117,76 @@ window.PondScene = (() => {
       ctx.restore();
     }
   }
-  function draw(s,wall) {
+  function cameraView(s, W, H, afloat, bx, by, tilt, towerTop, sinkOffset, dt) {
+    const fixed = {x: W/2, y: H/2 + sinkOffset, zoom: 1};
+    const view = s.camera;
+    if (!view || s.mode === "group") return fixed;
+
+    const towerSide = 116*s.boat.scale + 36*s.duck.size;
+    let x, y, zoom;
+    if (s.mode === "hold" && !s.quiet) {
+      const headX = bx - towerTop*Math.sin(tilt);
+      const headY = by + towerTop*Math.cos(tilt) - towerSide*Math.abs(Math.sin(tilt));
+      zoom = Math.min(1.22, W/(2*towerSide + 40));
+      x = mix(W/2, headX, ease(part(by-headY, H*.18, H*.58)));
+      y = Math.min(H/2, headY + H*.25/zoom);
+    } else {
+      // Leave room for the coming swing so the wide shot doesn't chase each wobble.
+      const hullSide = 158*s.boat.scale;
+      const angle = Math.max(Math.abs(tilt), .04 + .61*s.strain);
+      const swing = -towerTop*Math.sin(angle);
+      const side = Math.max(hullSide, towerSide);
+      const left = bx - side - (s.direction < 0 ? swing : 0);
+      const right = bx + side + (s.direction > 0 ? swing : 0);
+      const top = by + towerTop - towerSide*Math.sin(angle);
+      const bottom = Math.max(afloat + 28, by + 60*s.boat.scale + hullSide*Math.sin(angle));
+      const pad = Math.min(W,H)*.06;
+      zoom = Math.min(1, (W-2*pad)/(right-left), (H-2*pad)/(bottom-top));
+      const halfWidth = (W/2-pad)/zoom, halfHeight = (H/2-pad)/zoom;
+      x = Math.min(left+halfWidth, Math.max(fixed.x, right-halfWidth));
+      y = Math.min(top+halfHeight, Math.max(fixed.y, bottom-halfHeight));
+
+      const followSink = ease(part(s.sink, 0, .32));
+      x = mix(x, fixed.x, followSink);
+      y = mix(y, fixed.y, followSink);
+      zoom = mix(zoom, fixed.zoom, followSink);
+    }
+
+    const step = s.quiet || view.width !== W || view.height !== H ? 1 : 1-Math.exp(-dt*8);
+    view.x = mix(view.x ?? x, x, step);
+    view.y = mix(view.y ?? y, y, step);
+    view.zoom = mix(view.zoom ?? zoom, zoom, step);
+    view.width = W;
+    view.height = H;
+    return view;
+  }
+
+  function paintBackdrop(W, H, offset) {
+    if (!backdrop.complete || !backdrop.naturalWidth) {
+      ctx.fillStyle = "#b8e1cb"; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle = "#53ae9a"; ctx.fillRect(0,H*.55+offset,W,H);
+      return;
+    }
+    const scale = Math.max(W/backdrop.width, H/backdrop.height);
+    const width = backdrop.width*scale, height = backdrop.height*scale;
+    const x = (W-width)/2, y = (H-height)/2 + offset;
+    ctx.drawImage(backdrop,x,y,width,height);
+    if (y > 0) {
+      // Blend into the painted sky when the camera rises above it.
+      const fade = Math.min(H*.06,40);
+      const sky = ctx.createLinearGradient(0, y, 0, y+fade);
+      sky.addColorStop(0,"#96d2be");
+      sky.addColorStop(1,"rgba(150,210,190,0)");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0,0,W,y+fade);
+    }
+    if (y+height < H) {
+      ctx.fillStyle = "#109e86";
+      ctx.fillRect(0,y+height,W,H-y-height);
+    }
+  }
+
+  function draw(s,wall,dt=0) {
     const w=canvas.clientWidth,h=canvas.clientHeight;if(!w||!h)return;
     const dpr=Math.min(2,window.devicePixelRatio||1);
     if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr)}
@@ -122,17 +195,36 @@ window.PondScene = (() => {
     ctx.setTransform(scale,0,0,canvas.height/H,0,0);
     const afloat=H*(w<h?.65:.72), t=s.clock, r=s.ratio, end=s.sink;
     const intro=s.mode==="intro";
-    const camera=H*(intro?.085:.41)*ease(part(end,.17,.78));
-    const zoom=1+(s.quiet?.018:.06)*s.focus;
-    ctx.save();ctx.translate(W/2,H*.67);ctx.scale(zoom,zoom);ctx.translate(-W/2,-H*.67-camera);
-    if(backdrop.complete && backdrop.naturalWidth){
-      const k=Math.max(W/backdrop.width,H/backdrop.height);
-      ctx.drawImage(backdrop,(W-backdrop.width*k)/2,(H-backdrop.height*k)/2,backdrop.width*k,backdrop.height*k);
-    }else {ctx.fillStyle="#b8e1cb";ctx.fillRect(0,0,W,H);ctx.fillStyle="#53ae9a";ctx.fillRect(0,H*.55,W,H)}
+    const sinkOffset=H*(intro?.085:.41)*ease(part(end,.17,.78));
+    const bs=s.boat.scale;
+    const drop=intro
+      ? .26*ease(part(end,.13,.84))+.24*ease(part(end,.66,1))
+      : .49*ease(part(end,.12,.92))+.37*ease(part(end,.63,1));
+    const bx=W*.557,by=afloat-29*bs+Math.min(r,1.5)*12+Math.sin(t*1.7)*2+H*drop;
+    const landingTime = .44;
+    let settled = s.ducks.length, impact = 0;
+    for (let i=s.ducks.length-1; i>=0; i--) {
+      const d = s.ducks[i], age = t-d.born-landingTime;
+      if (age >= 1) break;
+      if (age < 0) settled = i;
+      else impact += Math.sin(age*14)*Math.exp(-age*4)*d.mass;
+    }
+    const landingRoll=end<.02 ? Math.tanh(impact)*(.006+.014*s.strain) : 0;
+    const tilt=s.angle+Math.sin(t*1.24)*.004+landingRoll;
+    const sin=Math.sin(tilt), cos=Math.cos(tilt);
+    const topRow = (Math.ceil(s.ducks.length / s.columns) - 1)*s.columns;
+    const towerTop = ((s.ducks[topRow]?.y ?? -22) - 4)*bs - 30*s.duck.size;
+    const view = cameraView(s, W, H, afloat, bx, by, tilt, towerTop, sinkOffset, dt);
+    const left = view.x-W/2/view.zoom, right = view.x+W/2/view.zoom;
+    const top = view.y-H/2/view.zoom, bottom = view.y+H/2/view.zoom;
+    const waterline = H/2 + (afloat-view.y)*view.zoom;
+    const parallax = Math.min(H*.46, (waterline-afloat+sinkOffset)*.68);
+    paintBackdrop(W, H, parallax-sinkOffset);
+    ctx.save();ctx.translate(W/2,H/2);ctx.scale(view.zoom,view.zoom);ctx.translate(-view.x,-view.y);
     // Fade the painted lake into the deep-water plate as the camera follows the hull.
     const deepPlate=ctx.createLinearGradient(0,afloat-1,0,H+1);
     deepPlate.addColorStop(0,"rgba(50,143,128,0)");deepPlate.addColorStop(1,"#398f83");
-    ctx.fillStyle=deepPlate;ctx.fillRect(0,afloat,W,H*2);
+    ctx.fillStyle=deepPlate;ctx.fillRect(left,afloat,right-left,Math.max(0,bottom-afloat));
     for(let i=0;i<11;i++){
       const x=(i*179+12+8*Math.sin(t*.6+i))%W, y=H*(.63+((i*13)%30)/100);
       line(x,y,x+10+i%4*8,y,"rgba(233,246,203,.38)",1.6);
@@ -144,54 +236,46 @@ window.PondScene = (() => {
       duck((112-i*43*s.duck.size/pierScale)*pierScale,afloat-11-21*pierScale-8*s.duck.size+Math.sin(t+i),
         s.duck.size,Math.sin(t+i)*.04,s.duck.heavy);
     }
-    const impact=s.ducks.reduce((sum,d)=>{const v=t-d.born-.44;return v>0&&v<1?sum+Math.sin(v*14)*Math.exp(-v*4)*d.mass:sum},0);
-    const landingRoll=end<.02 ? Math.tanh(impact)*(.006+.014*s.strain) : 0;
-    const tilt=s.angle+Math.sin(t*1.24)*.004+landingRoll;
-    const bs=s.boat.scale;
-    const drop=intro
-      ? .26*ease(part(end,.13,.84))+.24*ease(part(end,.66,1))
-      : .49*ease(part(end,.12,.92))+.37*ease(part(end,.63,1));
-    const bx=W*.557,by=afloat-29*bs+Math.min(r,1.5)*12+Math.sin(t*1.7)*2+H*drop;
     ellipse(bx,afloat+13,164*bs,10,"rgba(17,94,83,.23)");
     ring(bx,afloat+12,164*bs+5*Math.sin(t),.66);
-    const lastRow = Math.max(0, Math.ceil(s.ducks.length / s.columns) - 1);
-    const rowHeight = 23 * s.duck.size;
-    const heightLimit = Math.min((88 + 122 * clamp(r)) * bs, H * .34);
-    const pileHeight = Math.min(lastRow * rowHeight, heightLimit);
-    const visibleGaps = Math.min(lastRow, Math.floor(pileHeight / (rowHeight * .88)));
-    const rowLift = lastRow ? (rowHeight - pileHeight / lastRow) / bs : 0;
-    const seatOffset = band => s.shift*12 + (band%2-.5)*Math.min(8,50/s.columns);
+    const seatOffset = row => s.shift*12 + (row%2-.5)*Math.min(8,50/s.columns);
+    const rowSide = 135*bs + 36*s.duck.size;
+    const rowDepth = 8*bs + 36*s.duck.size;
+    const rowWidth = rowSide*Math.abs(cos) + rowDepth*Math.abs(sin);
+    const rowHeight = rowSide*Math.abs(sin) + rowDepth*Math.abs(cos);
     local(bx,by,bs,tilt,()=>{
       hullBack();
-      // Draw the rear rows first. At high loads, intervening rows sit behind the visible flock.
-      for(let band=visibleGaps;band>=0;band--){
-        const row=visibleGaps ? Math.round(band*lastRow/visibleGaps) : 0;
-        const start=row*s.columns, stop=Math.min(start+s.columns,s.ducks.length);
+      // Every row keeps its original height. Skip only rows entirely outside the camera.
+      for (let row=Math.ceil(settled/s.columns)-1; row>=0; row--) {
+        const start=row*s.columns, stop=Math.min(start+s.columns,settled);
+        const rowY=s.ducks[start].y*bs;
+        const x=bx-rowY*sin, y=by+rowY*cos;
+        if (x+rowWidth<left || x-rowWidth>right || y+rowHeight<top || y-rowHeight>bottom) continue;
+        const offset=seatOffset(row);
         for(let i=start;i<stop;i++){
-          const d=s.ducks[i], p=clamp((t-d.born)/.44);
-          if(p<1)continue;
-          const fall=Math.max(0,Math.sin((t-d.born-.44)*18))*Math.max(0,1-(t-d.born-.44)*4);
-          duck(d.x+seatOffset(band),d.y+row*rowLift-3*fall,d.size/bs,Math.sin(d.seed+t*2)*.045-tilt*.47,d.heavy);
+          const d=s.ducks[i], age=t-d.born-landingTime;
+          const fall=Math.max(0,Math.sin(age*18))*Math.max(0,1-age*4);
+          duck(d.x+offset,d.y-3*fall,d.size/bs,Math.sin(d.seed+t*2)*.045-tilt*.47,d.heavy);
         }
       }
       hullFront();
     });
-    for(let i=s.ducks.length-1;i>=0;i--){
-      const d=s.ducks[i],p=clamp((t-d.born)/.44);
-      if(p===1)break;
+    for(let i=s.ducks.length-1;i>=settled;i--){
+      const d=s.ducks[i],p=clamp((t-d.born)/landingTime);
       const row=Math.floor(i/s.columns);
-      const band=lastRow?Math.round(row*visibleGaps/lastRow):0;
-      const x=d.x+seatOffset(band),y=d.y+row*rowLift;
-      const tx=bx+bs*(x*Math.cos(tilt)-y*Math.sin(tilt)),ty=by+bs*(x*Math.sin(tilt)+y*Math.cos(tilt));
+      const x=d.x+seatOffset(row),y=d.y;
+      const tx=bx+bs*(x*cos-y*sin),ty=by+bs*(x*sin+y*cos);
       duck(mix(112*pierScale,tx,p),mix(afloat-11-21*pierScale-8*d.size,ty,p)-80*Math.sin(PI*p),d.size,Math.sin(PI*p)*-.18,d.heavy);
     }
     const water=ctx.createLinearGradient(0,afloat,0,afloat+H*.65);
     water.addColorStop(0,"rgba(51,145,131,"+(.15+.58*ease(part(end,.02,.55)))+")");
     water.addColorStop(.21,"rgba(28,116,113,"+(.19+.57*end)+")");
     water.addColorStop(1,"rgba(9,59,68,"+(.31+.65*end)+")");
-    ctx.fillStyle=water;ctx.beginPath();ctx.moveTo(-10,afloat);
-    for(let x=-10;x<=W+12;x+=5)ctx.lineTo(x,afloat+2*Math.sin(x*.035+t*2.1));
-    ctx.lineTo(W+12,H*2);ctx.lineTo(-12,H*2);ctx.fill();
+    const waveStep=5/Math.min(1,view.zoom), waveStart=Math.floor(left/waveStep)*waveStep;
+    const waveEnd=right+waveStep, waterBottom=Math.max(bottom,afloat+3);
+    ctx.fillStyle=water;ctx.beginPath();ctx.moveTo(waveStart,afloat);
+    for(let x=waveStart;x<=waveEnd;x+=waveStep)ctx.lineTo(x,afloat+2*Math.sin(x*.035+t*2.1));
+    ctx.lineTo(waveEnd,waterBottom);ctx.lineTo(waveStart,waterBottom);ctx.fill();
     ring(bx+124,afloat-2,25+4*Math.sin(t*1.9),.55);
     if(end>0){
       ctx.save();
@@ -252,7 +336,7 @@ window.PondScene = (() => {
     const angle=sequence(time,introTilt);
     draw({
       mode:"intro", boat:introBoat, duck:introDuck, columns:introSeats.length, clock:time,
-      ducks, ratio:.12+1.22*load, strain:load, angle, shift:1.4*Math.sin(angle), focus:0,
+      ducks, ratio:.12+1.22*load, strain:load, angle, shift:1.4*Math.sin(angle),
       sink:.93*ease(part(time,2.69,3.88))
     },time*1000);
   }
