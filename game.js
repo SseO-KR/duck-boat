@@ -139,7 +139,7 @@
     const boat = state?.boat ?? boatsByGroup.medium;
     const duck = pickDifferent(ducks, state?.duck);
     state = {boat, duck, columns: 1, clock: 1, quiet: reducedMotion, ducks: [], load: 0, moment: 0, ratio: 0,
-      strain: 0, angle: 0, shift: 0, focus: 0, sink: 0, lastBeat: -1};
+      strain: 0, angle: 0, shift: 0, sink: 0, lastBeat: -1, camera: {}};
     owner = null;
     surface.disabled = true;
     crew.hidden = false;
@@ -255,7 +255,7 @@
         const maxAngle = (.014 + .56 * s.strain) * s.direction * (s.quiet ? .68 : 1);
         const q = PondScene.sequence(p, [[0,0],[.20,.52],[.37,.90],[.56,.26],[.65,.31],[.86,1.06],[.92,1.04],[1,.11]]);
         s.angle = s.releaseAngle*(1-clamp(p*4)) + maxAngle*q;
-        s.shift = Math.sin(s.angle)*1.4; s.focus = clamp(p*4) * s.strain;
+        s.shift = Math.sin(s.angle)*1.4;
         const beat = p>.78 ? 2 : p>.52 ? 1 : p>.23 ? 0 : -1;
         if (beat !== s.lastBeat) {
           s.lastBeat = beat;
@@ -270,7 +270,7 @@
       }
       case "safe":
         s.endingTime = elapsed;
-        s.angle *= Math.exp(-dt*5); s.shift *= Math.exp(-dt*5); s.focus *= Math.exp(-dt*5);
+        s.angle *= Math.exp(-dt*5); s.shift *= Math.exp(-dt*5);
         if (elapsed >= 1.05) setMode("ready", "Pass the device. Hold to board more ducks.");
         break;
       case "sinking":
@@ -303,7 +303,8 @@
       introTitle.hidden = true;
       chooseGroup();
     }
-    if (!document.hidden && !help.open) {
+    const running = !document.hidden && !help.open;
+    if (running) {
       // Advance the active turn and its ending audio at the same tempo.
       const turnInProgress = state.mode === "hold" || state.mode === "balance" || inEnding();
       update(dt * (turnInProgress ? turnTempo : 1));
@@ -312,7 +313,7 @@
         Math.abs(endingAudio.currentTime - elapsed) > .20) {
       endingAudio.currentTime = Math.min(elapsed, endingLength);
     }
-    PondScene.draw(state,runTime*1000); requestAnimationFrame(frame);
+    PondScene.draw(state, runTime*1000, running ? dt : 0); requestAnimationFrame(frame);
   }
   updateSound();
   if (firstVisit() && !reducedMotion) {
